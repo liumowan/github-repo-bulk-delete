@@ -1,111 +1,55 @@
-# GitHub 仓库批量删除工具
+# GitHub 仓库批量删除（油猴脚本）
 
-一个**零依赖**的 Node.js 命令行工具，用来列出、筛选并批量删除你自己的 GitHub 仓库（比如清理大量 fork）。
+一个**零外部依赖**的油猴脚本，用来按条件筛选并批量删除你自己的 GitHub 仓库（比如清理大量 fork）。
 
-它直接调用 [GitHub REST API](https://docs.github.com/zh/rest)，**不依赖网页 DOM**，所以 GitHub 界面怎么改版都不影响使用——这也是它比老式油猴脚本（如 Greasy Fork 412188）稳的原因。
+- 右下角悬浮「批量删」按钮，点开即用，**不依赖 GitHub 页面结构**——不会因为 GitHub 界面改版而失效
+- 完全自绘 UI，不加载 jQuery / layer 等任何 CDN 资源——不会因为 CDN 被墙而启动失败
+- 直接调用 [GitHub REST API](https://docs.github.com/zh/rest)，删除前有二次确认
 
 作者：[liumowan](https://github.com/liumowan)
 
-## 功能
+## 安装
 
-- ✅ 一键列出当前账号的全部仓库（自动分页，含 fork）
-- ✅ 按条件筛选：fork / 非 fork、已归档 / 未归档、主语言、名称/描述关键词
-- ✅ 批量删除：传仓库名、按筛选条件、或 `--all` 全部删除
-- ✅ 删除前二次确认；`--dry-run` 干跑预览，不真正删除
-- ✅ Token 从 `.env` / 环境变量读取，绝不硬编码、绝不提交进 git
+### 1. 装油猴管理器
 
-## 环境要求
+Chrome / Edge 装 [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)（或 [Violentmonkey](https://violentmonkey.github.io/get-it/)），Firefox 同理。
 
-- Node.js **18+**（用内置 `fetch`，无需 `npm install` 任何依赖）
+### 2. 安装脚本
 
-## 快速开始
+打开本仓库的 `github-repo-bulk-delete.user.js`，Tampermonkey 会弹出安装页，点「安装」即可。
+
+> 也可以在 Tampermonkey 管理面板 → 新建脚本 → 把 `github-repo-bulk-delete.user.js` 全文粘贴进去保存。
+
+## 使用
 
 ### 1. 申请 Token
 
 1. 打开 <https://github.com/settings/tokens/new>
-2. 创建 **classic token**，勾选权限 `repo`（或至少 `delete_repo`）；
-   或者创建 **fine-grained token**，仓库权限里勾选 `Administration: Read and write`
-3. 生成后复制那串 `ghp_` 开头的 token
+2. 创建 **classic token**，勾选 `delete_repo`（至少）或 `repo`；
+   或创建 **fine-grained token**，仓库权限勾选 `Administration: Read and write`
+3. 生成后复制 `ghp_` 开头的 token
 
-### 2. 配置 Token
+### 2. 在 GitHub 页面操作
 
-```bash
-# 项目根目录下
-cp .env.example .env
-# 编辑 .env，把 GITHUB_TOKEN 换成你自己的
-```
+1. 打开任意 `github.com` 页面（登录状态），右下角出现绿色「**批量删**」按钮
+2. 点开面板，把 token 粘贴到输入框 → 点「保存」（token 只存在你本机的油猴存储里）
+3. 点「**加载仓库**」→ 列表出现你的全部仓库
+4. 用筛选条件缩小范围：关键词、语言、只看 fork、隐藏归档，点「筛选」
+5. 勾选要删的仓库（可点行、可「全选」）
+6. 点「**删除选中**」→ 核对清单 → 点「**确认删除**」
+7. 结果会显示成功/失败个数；失败多为 403 限流或权限问题，重新生成 token 再试
 
-> ⚠️ `.env` 已被 `.gitignore` 排除，**永远不要把它提交到 GitHub**。
+> ⚠️ **删除不可恢复**。勾选后先核对确认框里的仓库名再点确认。
 
-### 3. 查看你的仓库
+## 安全说明
 
-```bash
-node ghdel.js list
-node ghdel.js list --forks            # 只看 fork
-node ghdel.js list --language javascript
-node ghdel.js list --forks --language python --json
-```
+- Token 只保存在你本机浏览器（Tampermonkey 的 GM 存储），不会上传到任何第三方
+- 建议用完删除 token，或生成后只保留 `delete_repo` 权限
+- 删除操作串行批量执行（2 并发，每次间隔 400ms），避免触发 GitHub API 限流
 
-### 4. 删除仓库（先干跑，再真删）
+## 和旧油猴脚本的区别
 
-```bash
-# 先预览：按条件筛选出要删的清单
-node ghdel.js delete --forks --dry-run
-
-# 确认无误后真正删除（会二次确认）
-node ghdel.js delete --forks --language python
-
-# 也可以直接指定仓库
-node ghdel.js delete liumowan/old-repo
-node ghdel.js delete liumowan/a liumowan/b liumowan/c
-
-# 全部仓库（谨慎！）
-node ghdel.js delete --all --dry-run
-node ghdel.js delete --all --yes
-```
-
-## 命令参考
-
-```
-node ghdel.js list   [筛选参数] [--json]
-node ghdel.js delete <owner/repo ...> [--yes] [--dry-run]
-node ghdel.js delete [筛选参数] [--all] [--yes] [--dry-run]
-node ghdel.js help
-```
-
-### 筛选参数（可组合，组合条件为 AND）
-
-| 参数 | 说明 |
-| --- | --- |
-| `--forks` | 只看 fork 仓库 |
-| `--no-forks` | 只看自己创建的仓库 |
-| `--archived` | 只看已归档仓库 |
-| `--no-archived` | 只看未归档仓库 |
-| `--language <语言>` | 按主语言筛选，如 `javascript` / `python` / `go` |
-| `--search <关键词>` | 按仓库名 / 描述关键词筛选 |
-
-### 其他参数
-
-| 参数 | 说明 |
-| --- | --- |
-| `--token <token>` | 临时指定 token（更推荐写入 `.env`） |
-| `--json` | 以 JSON 输出（仅 `list`） |
-| `--dry-run` | 只预览将删除的清单，不真正删除 |
-| `--yes` | 跳过确认提示（自动化脚本用，谨慎） |
-| `--all` | 选中全部仓库（无筛选时 = 删除所有仓库，慎用） |
-
-## 安全提示
-
-- **删除不可恢复**。动手前先用 `--dry-run` 确认清单。
-- Token 权限遵循最小化原则：平时只给 `repo` 读权限或干脆用完即删，需要删除时再生成带 `delete_repo` 的 token。
-- `.env` 里是你的真实 token，已加入 `.gitignore`；更换电脑 / 怀疑泄露时，去 GitHub 设置里**撤销**旧 token。
-- 若反复出现删除失败（403），多为 GitHub API 限流或 token 权限不足，重新生成一个 token 换掉即可。
-
-## 技术说明
-
-- 数据源：`GET /user/repos`（当前登录账号，自动分页拉全）
-- 删除：`DELETE /repos/{owner}/{repo}`（HTTP 204 为成功）
-- 单文件实现，无任何第三方依赖，可直接阅读源码。
+老脚本（如 Greasy Fork 412188，2020 年）依赖页面里的 `#user-repositories-list`、`ul.UnderlineNav-body` 等 DOM 元素，GitHub 2023 年改版后这些结构没了，脚本就失效了。本脚本不碰页面结构，只往页面里注入一个浮动面板，通过官方 API 工作，因此长期可用。
 
 ## License
 
