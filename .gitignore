@@ -1,0 +1,10 @@
+# Token 文件 —— 千万别提交到 git！
+.env
+
+# Node
+node_modules/
+
+# 日志 / 系统文件
+*.log
+.DS_Store
+Thumbs.db
