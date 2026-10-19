@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub 仓库批量删除
 // @namespace    https://github.com/liumowan
-// @version      1.0.0
+// @version      1.1.0
 // @description  右下角悬浮面板，按条件筛选、批量删除 GitHub 仓库。API 驱动、零外部依赖，GitHub 界面改版也不失效。
 // @author       liumowan
 // @license      MIT
@@ -23,6 +23,7 @@
   let filtered = [];
   let selected = new Set();
   let deleting = false;
+  let panelOpen = false;
 
   // ---------------- 工具 ----------------
   const esc = (s) =>
@@ -30,6 +31,12 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
     );
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 当前是否在某个仓库详情页，返回 owner/repo，否则返回 ''
+  const currentRepo = () => {
+    const m = document.querySelector('meta[name="octolytics-dimension-repository_nwo"]');
+    return m ? m.content : '';
+  };
 
   function req(method, url, headers, body) {
     return new Promise((resolve, reject) => {
@@ -237,6 +244,57 @@
     } catch (_) {}
   }
 
+  // ---------------- 一键删除当前仓库 ----------------
+  function confirmDeleteCurrent() {
+    const nwo = currentRepo();
+    if (!nwo) {
+      setMsg('当前页面不是仓库页，无法快速删除当前仓库', true);
+      return;
+    }
+    if (!token) {
+      setMsg('请先在上方输入并保存 Token', true);
+      return;
+    }
+    const box = document.getElementById('bd-confirm');
+    box.hidden = false;
+    box.innerHTML =
+      '<div>将删除当前仓库：<b class="bd-preview">' + esc(nwo) + '</b>，<b>不可恢复</b>：</div>' +
+      '<div class="bd-row">' +
+      '<button id="bd-ok" type="button" class="bd-danger">确认删除</button>' +
+      '<button id="bd-cancel" type="button">取消</button>' +
+      '</div>';
+    document.getElementById('bd-cancel').addEventListener('click', () => {
+      box.hidden = true;
+    });
+    document.getElementById('bd-ok').addEventListener('click', () => {
+      box.hidden = true;
+      doDeleteOne(nwo);
+    });
+  }
+
+  async function doDeleteOne(nwo) {
+    if (deleting) return;
+    deleting = true;
+    setMsg('正在删除 ' + nwo + ' …', false);
+    try {
+      const { status, data } = await api('/repos/' + nwo, 'DELETE');
+      if (status === 204) {
+        setMsg('已删除 ' + nwo + '。该仓库已不存在，刷新页面即可。', false);
+        allRepos = allRepos.filter((r) => r.full_name !== nwo);
+        selected.delete(nwo);
+        applyFilter();
+      } else if (status === 404) {
+        setMsg('删除失败：仓库不存在或无权访问（404）', true);
+      } else {
+        setMsg('删除失败：' + ((data && data.message) || 'HTTP ' + status), true);
+      }
+    } catch (e) {
+      setMsg('删除失败：' + e.message, true);
+    } finally {
+      deleting = false;
+    }
+  }
+
   // ---------------- UI ----------------
   const CSS = [
     '#bd-root{position:fixed;right:0;bottom:0;z-index:2147483000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#1f2328;text-align:left}',
@@ -262,6 +320,10 @@
     '.bd-item input{margin:0;cursor:pointer}',
     '.bd-item-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.bd-item-meta{color:#8c959f;font-size:11px;white-space:nowrap}',
+    '.bd-current{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #ffebe9;background:#fff5f5;border-radius:6px}',
+    '.bd-current-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#57606a}',
+    '#bd-del-cur{border:1px solid #cf222e;background:#cf222e;color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap}',
+    '#bd-del-cur:hover{background:#a40e26}',
     '.bd-foot{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid #eaeef2;background:#f6f8fa}',
     '.bd-foot button{border:1px solid #d1d9e0;background:#fff;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;color:#1f2328}',
     '.bd-foot button:hover{background:#f6f8fa}',
@@ -273,7 +335,10 @@
   ].join('\n');
 
   function buildUI() {
+    const oldStyle = document.getElementById('bd-style');
+    if (oldStyle) oldStyle.remove();
     const style = document.createElement('style');
+    style.id = 'bd-style';
     style.textContent = CSS;
     document.head.appendChild(style);
 
@@ -284,6 +349,7 @@
       '<div id="bd-panel">' +
       '<div class="bd-head">GitHub 仓库批量删除<button id="bd-close" type="button">✕</button></div>' +
       '<div class="bd-body">' +
+      '<div id="bd-current" class="bd-current" hidden><span class="bd-current-name"></span><button id="bd-del-cur" type="button" class="bd-danger">删除当前仓库</button></div>' +
       '<div class="bd-row"><input id="bd-token" type="password" placeholder="GitHub Token（delete_repo 权限）" autocomplete="off"><button id="bd-save" type="button">保存</button></div>' +
       '<div class="bd-row"><button id="bd-load" type="button">加载仓库</button><span id="bd-count" class="bd-muted"></span></div>' +
       '<div class="bd-row"><input id="bd-search" type="text" placeholder="名称 / 描述关键词"><input id="bd-lang" type="text" placeholder="语言如 javascript"></div>' +
@@ -300,6 +366,13 @@
       '<div id="bd-msg" class="bd-msg"></div>' +
       '</div>';
     document.body.appendChild(root);
+
+    const nwo = currentRepo();
+    if (nwo) {
+      const bar = document.getElementById('bd-current');
+      bar.hidden = false;
+      document.querySelector('#bd-current .bd-current-name').textContent = nwo;
+    }
   }
 
   function init() {
@@ -309,9 +382,11 @@
 
     $id('bd-toggle').addEventListener('click', () => {
       $id('bd-panel').classList.toggle('open');
+      panelOpen = $id('bd-panel').classList.contains('open');
     });
     $id('bd-close').addEventListener('click', () => {
       $id('bd-panel').classList.remove('open');
+      panelOpen = false;
     });
     $id('bd-token').value = token;
     $id('bd-save').addEventListener('click', () => {
@@ -338,11 +413,43 @@
       renderList();
     });
     $id('bd-del').addEventListener('click', confirmDelete);
+    $id('bd-del-cur').addEventListener('click', confirmDeleteCurrent);
+
+    if (panelOpen) $id('bd-panel').classList.add('open');
+    if (allRepos.length) renderList();
+  }
+
+  // ---------------- 页面导航（GitHub Turbo 软导航）后重新注入 ----------------
+  function onNavigate() {
+    const old = document.getElementById('bd-root');
+    if (old) old.remove();
+    init();
+  }
+
+  function watchNavigation() {
+    ['turbo:load', 'turbo:render', 'pjax:end'].forEach((ev) => {
+      document.addEventListener(ev, () => setTimeout(onNavigate, 60));
+    });
+    let timer = null;
+    const obs = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (document.body && !document.getElementById('bd-root')) {
+          init();
+        }
+      }, 400);
+    });
+    if (document.body) obs.observe(document.body, { childList: true, subtree: false });
+  }
+
+  function boot() {
+    init();
+    watchNavigation();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    init();
+    boot();
   }
 })();
