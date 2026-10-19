@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub 仓库批量删除
 // @namespace    https://github.com/liumowan
-// @version      1.2.0
+// @version      1.3.0
 // @description  右下角悬浮面板，按条件筛选、批量删除 GitHub 仓库。API 驱动、零外部依赖，GitHub 界面改版也不失效。
 // @author       liumowan
 // @license      MIT
@@ -238,8 +238,15 @@
     if (failList.length) msg += ' 失败：' + failList.slice(0, 5).join('；');
     setMsg(msg, failList.length > 0 && okList.length === 0);
 
-    // 删除完成后自动刷新页面
-    setTimeout(() => location.reload(), 2500);
+    // 删除完成后跳回仓库列表页
+    const owner = names.length ? names[0].split('/')[0] : '';
+    setTimeout(() => {
+      if (owner) {
+        location.href = 'https://github.com/' + owner + '?tab=repositories';
+      } else {
+        location.reload();
+      }
+    }, 2500);
   }
 
   // ---------------- 一键删除当前仓库 ----------------
@@ -277,11 +284,13 @@
     try {
       const { status, data } = await api('/repos/' + nwo, 'DELETE');
       if (status === 204) {
-        setMsg('已删除 ' + nwo + '，即将自动刷新页面…', false);
+        setMsg('已删除 ' + nwo + '，即将跳回你的仓库列表页…', false);
         allRepos = allRepos.filter((r) => r.full_name !== nwo);
         selected.delete(nwo);
         applyFilter();
-        setTimeout(() => location.reload(), 1200);
+        setTimeout(() => {
+          location.href = 'https://github.com/' + nwo.split('/')[0] + '?tab=repositories';
+        }, 1200);
       } else if (status === 404) {
         setMsg('删除失败：仓库不存在或无权访问（404）', true);
       } else {
