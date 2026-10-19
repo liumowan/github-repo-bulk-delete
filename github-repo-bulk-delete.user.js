@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub 仓库批量删除
 // @namespace    https://github.com/liumowan
-// @version      1.1.0
+// @version      1.2.0
 // @description  右下角悬浮面板，按条件筛选、批量删除 GitHub 仓库。API 驱动、零外部依赖，GitHub 界面改版也不失效。
 // @author       liumowan
 // @license      MIT
@@ -238,10 +238,8 @@
     if (failList.length) msg += ' 失败：' + failList.slice(0, 5).join('；');
     setMsg(msg, failList.length > 0 && okList.length === 0);
 
-    // 重新拉取列表，反映最新状态
-    try {
-      await loadRepos();
-    } catch (_) {}
+    // 删除完成后自动刷新页面
+    setTimeout(() => location.reload(), 2500);
   }
 
   // ---------------- 一键删除当前仓库 ----------------
@@ -279,10 +277,11 @@
     try {
       const { status, data } = await api('/repos/' + nwo, 'DELETE');
       if (status === 204) {
-        setMsg('已删除 ' + nwo + '。该仓库已不存在，刷新页面即可。', false);
+        setMsg('已删除 ' + nwo + '，即将自动刷新页面…', false);
         allRepos = allRepos.filter((r) => r.full_name !== nwo);
         selected.delete(nwo);
         applyFilter();
+        setTimeout(() => location.reload(), 1200);
       } else if (status === 404) {
         setMsg('删除失败：仓库不存在或无权访问（404）', true);
       } else {
@@ -299,8 +298,9 @@
   const CSS = [
     '#bd-root{position:fixed;right:0;bottom:0;z-index:2147483000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#1f2328;text-align:left}',
     '#bd-root *{box-sizing:border-box;font-family:inherit}',
-    '#bd-toggle{position:fixed;right:16px;bottom:16px;background:#2da44e;color:#fff;border:0;border-radius:999px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28)}',
+    '#bd-toggle{position:fixed;right:18px;bottom:18px;width:46px;height:46px;border-radius:50%;background:#2da44e;color:#fff;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);padding:0}',
     '#bd-toggle:hover{background:#2c974b}',
+    '#bd-toggle svg{width:22px;height:22px;display:block}',
     '#bd-panel{position:fixed;right:16px;bottom:60px;width:420px;max-width:calc(100vw - 32px);max-height:75vh;display:none;flex-direction:column;background:#fff;border:1px solid #d1d9e0;border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.25);overflow:hidden}',
     '#bd-panel.open{display:flex}',
     '.bd-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #eaeef2;font-weight:600;background:#f6f8fa}',
@@ -345,7 +345,9 @@
     const root = document.createElement('div');
     root.id = 'bd-root';
     root.innerHTML =
-      '<button id="bd-toggle" type="button">批量删</button>' +
+      '<button id="bd-toggle" type="button" title="批量删除仓库" aria-label="批量删除仓库">' +
+      '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.5 1.75a.25.25 0 0 1 .25-.25h2.5a.25.25 0 0 1 .25.25V3h-3V1.75Zm4.5 0V3h2.25a.75.75 0 0 1 0 1.5H13v9.25A2.25 2.25 0 0 1 10.75 16h-5.5A2.25 2.25 0 0 1 3 13.75V4.5H2.25a.75.75 0 0 1 0-1.5H4.5V1.75A1.25 1.25 0 0 1 5.75.5h4.5A1.25 1.25 0 0 1 11.5 1.75ZM4.5 4.5v9.25c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75V4.5h-7Zm2.5 2a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 7 6.5Zm3.75.75a.75.75 0 0 1 1.5 0v4.5a.75.75 0 0 1-1.5 0v-4.5Z"/></svg>' +
+      '</button>' +
       '<div id="bd-panel">' +
       '<div class="bd-head">GitHub 仓库批量删除<button id="bd-close" type="button">✕</button></div>' +
       '<div class="bd-body">' +
