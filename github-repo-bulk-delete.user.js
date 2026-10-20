@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         GitHub 仓库批量删除
 // @namespace    https://github.com/liumowan
-// @version      1.5.0
+// @version      1.6.0
 // @description  右下角悬浮面板，按条件筛选、批量删除 GitHub 仓库。API 驱动、零外部依赖，GitHub 界面改版也不失效。
 // @author       liumowan
 // @license      MIT
 // @match        *://github.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @connect      api.github.com
 // @run-at       document-idle
 // ==/UserScript==
@@ -17,12 +19,32 @@
 
   const API = 'https://api.github.com';
   const TOKEN_KEY = 'gh_bulk_delete_token';
+  let token = GM_getValue(TOKEN_KEY, '');
 
-  // ====== 把你的 GitHub Token 填在下面这行（只填在篡改猴里安装的脚本副本，千万别提交到 GitHub 仓库）======
-  // 例如：const CONFIG_TOKEN = 'ghp_xxxxxxxxxxxxxxxxxxxx';
-  const CONFIG_TOKEN = '';
+  // ====== Token 通过篡改猴菜单设置：点浏览器工具栏的篡改猴图标 → 菜单里点「设置 GitHub Token」 ======
+  // 不显示在页面面板里，所以浏览器不会弹保存密码提示
+  function saveToken() {
+    const v = window.prompt(
+      '粘贴你的 GitHub Token（至少 delete_repo 权限），确定后自动保存：',
+      token || ''
+    );
+    if (v === null) return; // 点了取消
+    token = v.trim();
+    GM_setValue(TOKEN_KEY, token);
+    window.alert(token ? 'Token 已保存，之后会自动使用。' : 'Token 已清空。');
+  }
 
-  let token = CONFIG_TOKEN || GM_getValue(TOKEN_KEY, '');
+  function clearToken() {
+    if (!window.confirm('确定清除已保存的 GitHub Token 吗？')) return;
+    token = '';
+    GM_setValue(TOKEN_KEY, '');
+    window.alert('Token 已清除。');
+  }
+
+  if (typeof GM_registerMenuCommand === 'function') {
+    GM_registerMenuCommand('设置 GitHub Token', saveToken);
+    GM_registerMenuCommand('清除 GitHub Token', clearToken);
+  }
   let allRepos = [];
   let filtered = [];
   let selected = new Set();
@@ -168,7 +190,7 @@
   // ---------------- 数据操作 ----------------
   async function loadRepos() {
     if (!token) {
-      setMsg('未设置 Token：请在篡改猴里编辑本脚本，把顶部 CONFIG_TOKEN 改成你的 token 后保存。', true);
+      setMsg('未设置 Token：点浏览器工具栏的篡改猴图标 → 选「设置 GitHub Token」输入并保存后再试。', true);
       return;
     }
     setMsg('正在加载仓库列表…', false);
@@ -257,7 +279,7 @@
       return;
     }
     if (!token) {
-      setMsg('未设置 Token：请在篡改猴里编辑本脚本，把顶部 CONFIG_TOKEN 改成你的 token 后保存。', true);
+      setMsg('未设置 Token：点浏览器工具栏的篡改猴图标 → 选「设置 GitHub Token」输入并保存后再试。', true);
       return;
     }
     const box = document.getElementById('bd-confirm');
