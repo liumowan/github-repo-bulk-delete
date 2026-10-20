@@ -32,15 +32,18 @@ Chrome / Edge 装 [Tampermonkey](https://chrome.google.com/webstore/detail/tampe
    或创建 **fine-grained token**，仓库权限勾选 `Administration: Read and write`
 3. 生成后复制 `ghp_` 开头的 token
 
-### 2. 在 GitHub 页面操作
+### 2. 在脚本里填 Token（不在面板里输入）
 
-1. 打开任意 `github.com` 页面（登录状态），右下角出现一个绿色圆形气泡按钮
-2. 点开面板，把 token 粘贴到输入框 → 点「保存」（token 只存在你本机的油猴存储里）
-3. 点「**加载仓库**」→ 列表出现你的全部仓库
-4. 用筛选条件缩小范围：关键词、语言、只看 fork、隐藏归档，点「筛选」
-5. 勾选要删的仓库（可点行、可「全选」）
-6. 点「**删除选中**」→ 核对清单 → 点「**确认删除**」
-7. 结果会显示成功/失败个数；失败多为 403 限流或权限问题，重新生成 token 再试
+1. 打开 Tampermonkey 管理面板 → 找到本脚本 → 点「编辑」
+2. 找到脚本顶部的 `const CONFIG_TOKEN = '';`，把空字符串换成你的 token（`ghp_...`），保存
+3. 打开任意 `github.com` 页面（登录状态），右下角出现一个绿色圆形气泡按钮
+4. 点「**加载仓库**」→ 列表出现你的全部仓库
+5. 用筛选条件缩小范围：关键词、语言、只看 fork、隐藏归档，点「筛选」
+6. 勾选要删的仓库（可点行、可「全选」）
+7. 点「**删除选中**」→ 核对清单 → 点「**确认删除**」
+8. 成功删除后自动跳回你的仓库列表页
+
+> Token 写在脚本里，面板里不再有输入框，所以浏览器不会再弹「是否保存密码」。
 
 ### 3. 在仓库详情页一键删除当前仓库
 
@@ -56,7 +59,8 @@ Chrome / Edge 装 [Tampermonkey](https://chrome.google.com/webstore/detail/tampe
 
 ## 安全说明
 
-- Token 只保存在你本机浏览器（Tampermonkey 的 GM 存储），不会上传到任何第三方
+- Token 写在脚本里（只在你本机篡改猴中的副本），不会上传到任何第三方；**本仓库公开版本里的 `CONFIG_TOKEN` 保持为空**
+- 不要把填了 token 的脚本提交回 GitHub——提交前确认 `CONFIG_TOKEN = '';` 是空的
 - 建议用完删除 token，或生成后只保留 `delete_repo` 权限
 - 删除操作串行批量执行（2 并发，每次间隔 400ms），避免触发 GitHub API 限流
 

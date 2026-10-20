@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         GitHub 仓库批量删除
 // @namespace    https://github.com/liumowan
-// @version      1.4.0
+// @version      1.5.0
 // @description  右下角悬浮面板，按条件筛选、批量删除 GitHub 仓库。API 驱动、零外部依赖，GitHub 界面改版也不失效。
 // @author       liumowan
 // @license      MIT
 // @match        *://github.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
-// @grant        GM_setValue
 // @connect      api.github.com
 // @run-at       document-idle
 // ==/UserScript==
@@ -18,7 +17,12 @@
 
   const API = 'https://api.github.com';
   const TOKEN_KEY = 'gh_bulk_delete_token';
-  let token = GM_getValue(TOKEN_KEY, '');
+
+  // ====== 把你的 GitHub Token 填在下面这行（只填在篡改猴里安装的脚本副本，千万别提交到 GitHub 仓库）======
+  // 例如：const CONFIG_TOKEN = 'ghp_xxxxxxxxxxxxxxxxxxxx';
+  const CONFIG_TOKEN = '';
+
+  let token = CONFIG_TOKEN || GM_getValue(TOKEN_KEY, '');
   let allRepos = [];
   let filtered = [];
   let selected = new Set();
@@ -164,7 +168,7 @@
   // ---------------- 数据操作 ----------------
   async function loadRepos() {
     if (!token) {
-      setMsg('请先在上方输入并保存 Token', true);
+      setMsg('未设置 Token：请在篡改猴里编辑本脚本，把顶部 CONFIG_TOKEN 改成你的 token 后保存。', true);
       return;
     }
     setMsg('正在加载仓库列表…', false);
@@ -253,7 +257,7 @@
       return;
     }
     if (!token) {
-      setMsg('请先在上方输入并保存 Token', true);
+      setMsg('未设置 Token：请在篡改猴里编辑本脚本，把顶部 CONFIG_TOKEN 改成你的 token 后保存。', true);
       return;
     }
     const box = document.getElementById('bd-confirm');
@@ -355,7 +359,6 @@
       '<div class="bd-head">GitHub 仓库批量删除<button id="bd-close" type="button">✕</button></div>' +
       '<div class="bd-body">' +
       '<div id="bd-current" class="bd-current" hidden><span class="bd-current-name"></span><button id="bd-del-cur" type="button" class="bd-danger">删除当前仓库</button></div>' +
-      '<div class="bd-row"><input id="bd-token" type="password" placeholder="GitHub Token（delete_repo 权限）" autocomplete="off"><button id="bd-save" type="button">保存</button></div>' +
       '<div class="bd-row"><button id="bd-load" type="button">加载仓库</button><span id="bd-count" class="bd-muted"></span></div>' +
       '<div class="bd-row"><input id="bd-search" type="text" placeholder="名称 / 描述关键词"><input id="bd-lang" type="text" placeholder="语言如 javascript"></div>' +
       '<div class="bd-row"><label class="bd-check"><input id="bd-fork" type="checkbox"> 只看 fork</label><label class="bd-check"><input id="bd-hide-arch" type="checkbox"> 隐藏归档</label><button id="bd-filter" type="button">筛选</button></div>' +
@@ -392,12 +395,6 @@
     $id('bd-close').addEventListener('click', () => {
       $id('bd-panel').classList.remove('open');
       panelOpen = false;
-    });
-    $id('bd-token').value = token;
-    $id('bd-save').addEventListener('click', () => {
-      token = $id('bd-token').value.trim();
-      GM_setValue(TOKEN_KEY, token);
-      setMsg(token ? 'Token 已保存（只存在本机油猴存储）' : 'Token 已清空', false);
     });
     $id('bd-load').addEventListener('click', () => {
       loadRepos().catch((e) => setMsg(e.message, true));
